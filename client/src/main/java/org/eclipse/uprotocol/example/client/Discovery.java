@@ -126,7 +126,6 @@ public class Discovery extends Fragment implements AdapterView.OnItemSelectedLis
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        startService();
         return inflater.inflate(R.layout.udiscovery, container, false);
     }
 
@@ -159,6 +158,7 @@ public class Discovery extends Fragment implements AdapterView.OnItemSelectedLis
     }
 
     private void initializeUPClient() {
+        startService();
         mUpClient = UPClient.create(requireContext(), mExecutor, this);
         mUDiscovery = UDiscovery.newStub(mUpClient, UAuthority.newBuilder().getDefaultInstanceForType(), CallOptions.DEFAULT);
         mUpClient.connect().thenApply(connected -> {
@@ -173,7 +173,8 @@ public class Discovery extends Fragment implements AdapterView.OnItemSelectedLis
 
     private void lookupUri() {
         UEntity uEntity = UEntity.newBuilder().setName(TEST_ENTITY_NAME).build();
-        final UUri lookupUriRequest = UUri.newBuilder().setEntity(uEntity).build();
+        UAuthority authority = UAuthority.newBuilder().setName(TEST_AUTHORITY_NAME).build();
+        final UUri lookupUriRequest = UUri.newBuilder().setEntity(uEntity).setAuthority(authority).build();
         mUDiscovery.lookupUri(lookupUriRequest)
                 .thenApply(uriResponse -> {
                     final UStatus status = uriResponse.getStatus();
@@ -182,6 +183,9 @@ public class Discovery extends Fragment implements AdapterView.OnItemSelectedLis
                     final UUri uri = uriResponse.getUris().getUris(0);
                     mLog.i(TAG, join(Key.EVENT, "received LookupUri response " + uri, status));
                     return uriResponse;
+                }).exceptionally(e -> {
+                    mLog.e(TAG, join(Key.EVENT, "lookupUri Exception", toStatus(e)));
+                    return null;
                 });
     }
 
@@ -197,26 +201,33 @@ public class Discovery extends Fragment implements AdapterView.OnItemSelectedLis
                     final int nodesCount = findNodesResponse.getNodesCount();
                     mLog.i(TAG, join(Key.EVENT, "received FindNodesResponse -> Node count and UStatus" + nodesCount, status));
                     return findNodesResponse;
+                }).exceptionally(e -> {
+                    mLog.e(TAG, join(Key.EVENT, "findNodes Exception", toStatus(e)));
+                    return null;
                 });
     }
 
     private void addNodes() {
+        try {
         UResource uResource = UResourceBuilder.forRpcRequest(METHOD_ADD_NODES);
         final UUri uUri = UUri.newBuilder().setEntity(SERVICE).setResource(uResource).build();
         Node.Builder nodeBuilder = Node.newBuilder();
-        try {
-            JsonFormat.parser().ignoringUnknownFields().merge(REGISTRY_JSON, nodeBuilder);
-        } catch (InvalidProtocolBufferException e) {
-            throw new RuntimeException(e);
-        }
-        final AddNodesRequest findNodesRequest = AddNodesRequest.newBuilder().setParentUri(uUri.toString()).
+        JsonFormat.parser().ignoringUnknownFields().merge(REGISTRY_JSON, nodeBuilder);
+        String uri = LongUriSerializer.instance().serialize(uUri);
+        final AddNodesRequest findNodesRequest = AddNodesRequest.newBuilder().setParentUri(uri).
                 setNodes(0, nodeBuilder).build();
         mUDiscovery.addNodes(findNodesRequest)
                 .thenApply(status -> {
                     checkStatusOk(status);
                     mLog.i(TAG, join(Key.EVENT, "received AddNodes response", status));
                     return status;
+                }).exceptionally(e -> {
+                    mLog.e(TAG, join(Key.EVENT, "addNodes Exception", toStatus(e)));
+                    return null;
                 });
+        } catch (Exception e) {
+            mLog.e(TAG, join(Key.EVENT, "addNodes Exception", toStatus(e)));
+        }
     }
 
     private void deleteNodes() {
@@ -229,6 +240,9 @@ public class Discovery extends Fragment implements AdapterView.OnItemSelectedLis
                     checkStatusOk(uStatus);
                     mLog.i(TAG, join(Key.EVENT, "received DeleteNodes response", uStatus));
                     return uStatus;
+                }).exceptionally(e -> {
+                    mLog.e(TAG, join(Key.EVENT, "deleteNodes Exception", toStatus(e)));
+                    return null;
                 });
     }
 
@@ -238,23 +252,28 @@ public class Discovery extends Fragment implements AdapterView.OnItemSelectedLis
 
     @Override
     public void onItemSelected(AdapterView<?> adapterView, View view, int pos, long l) {
-        if (mUpClient.isDisconnected()) {
-            mLog.w(TAG, join(Key.EVENT, "UPClient is not connected"));
-            return;
-        }
-        final String viewSelectedItem = adapterView.getSelectedItem().toString();
-        switch (viewSelectedItem) {
-            case METHOD_LOOKUP_URI -> lookupUri();
-            case METHOD_FIND_NODES -> findNodes();
-            case METHOD_ADD_NODES -> addNodes();
-            case METHOD_DELETE_NODES -> deleteNodes();
-            case METHOD_UPDATE_NODE,
-                    METHOD_FIND_NODE_PROPERTIES,
-                    METHOD_UPDATE_PROPERTY,
-                    METHOD_REGISTER_FOR_NOTIFICATIONS,
-                    METHOD_UNREGISTER_FOR_NOTIFICATIONS -> notYetImplemented();
-            default -> {
+        try {
+            if (mUpClient.isDisconnected()) {
+                mLog.w(TAG, join(Key.EVENT, "UPClient is not connected"));
+                return;
             }
+            final String viewSelectedItem = adapterView.getSelectedItem().toString();
+            mLog.i(TAG, join(Key.EVENT, "onItemSelected", viewSelectedItem));
+            switch (viewSelectedItem) {
+                case METHOD_LOOKUP_URI -> lookupUri();
+                case METHOD_FIND_NODES -> findNodes();
+                case METHOD_ADD_NODES -> addNodes();
+                case METHOD_DELETE_NODES -> deleteNodes();
+                case METHOD_UPDATE_NODE,
+                        METHOD_FIND_NODE_PROPERTIES,
+                        METHOD_UPDATE_PROPERTY,
+                        METHOD_REGISTER_FOR_NOTIFICATIONS,
+                        METHOD_UNREGISTER_FOR_NOTIFICATIONS -> notYetImplemented();
+                default -> {
+                }
+            }
+        } catch (Exception e) {
+            mLog.e(TAG, join(Key.EVENT, "onItemSelected Exception", toStatus(e)));
         }
     }
 
