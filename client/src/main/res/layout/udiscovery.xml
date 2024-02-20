@@ -37,7 +37,7 @@
                 android:layout_alignParentStart="true"
                 android:layout_alignParentTop="true"
                 android:layout_marginEnd="5dp"
-                android:text="@string/door_label"
+                android:text="@string/selectOption"
                 android:textStyle="bold"
                 android:textSize="20sp" />
 
