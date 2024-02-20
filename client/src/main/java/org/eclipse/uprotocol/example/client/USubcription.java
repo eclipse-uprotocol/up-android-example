@@ -21,8 +21,12 @@
  * SPDX-FileCopyrightText: 2023 General Motors GTO LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
 package org.eclipse.uprotocol.example.client;
 
+import static android.content.Context.BIND_AUTO_CREATE;
+import static androidx.core.content.ContextCompat.getMainExecutor;
+import static org.eclipse.uprotocol.UPClient.create;
 import static org.eclipse.uprotocol.common.util.UStatusUtils.buildStatus;
 import static org.eclipse.uprotocol.common.util.UStatusUtils.isOk;
 import static org.eclipse.uprotocol.common.util.UStatusUtils.toStatus;
@@ -30,7 +34,6 @@ import static org.eclipse.uprotocol.common.util.log.Formatter.join;
 import static org.eclipse.uprotocol.common.util.log.Formatter.status;
 import static org.eclipse.uprotocol.common.util.log.Formatter.stringify;
 import static org.eclipse.uprotocol.transport.builder.UPayloadBuilder.unpack;
-
 import static java.lang.System.currentTimeMillis;
 
 import android.content.ComponentName;
@@ -39,11 +42,15 @@ import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
 
 import org.eclipse.uprotocol.UPClient;
 import org.eclipse.uprotocol.common.UStatusException;
@@ -69,7 +76,8 @@ import org.eclipse.uprotocol.v1.UUri;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
-public class ExampleActivity extends AppCompatActivity {
+public class USubcription extends Fragment {
+
     private static final UEntity ENTITY = UEntity.newBuilder()
             .setName("example.client")
             .setVersionMajor(1)
@@ -93,7 +101,7 @@ public class ExampleActivity extends AppCompatActivity {
             .build();
     private static final String EXAMPLE_SERVICE_PACKAGE = "org.eclipse.uprotocol.example.service";
     private static final ComponentName EXAMPLE_SERVICE_COMPONENT =
-            new ComponentName(EXAMPLE_SERVICE_PACKAGE,EXAMPLE_SERVICE_PACKAGE + ".ExampleService");
+            new ComponentName(EXAMPLE_SERVICE_PACKAGE, EXAMPLE_SERVICE_PACKAGE + ".ExampleService");
 
     private final Logger mLog = new Logger();
     private final ServiceConnection mServiceConnectionListener = new ServiceConnection() {
@@ -111,37 +119,37 @@ public class ExampleActivity extends AppCompatActivity {
     private UPClient mUPClient;
     private USubscription.Stub mUSubscriptionStub;
     private Example.Stub mExampleStub;
-    private final UListener mUListener = this::handleMessage;
     private TextView mDoorLockState;
+    private final UListener mUListener = this::handleMessage;
     private Button mDoorLockButton;
     private Button mDoorUnlockButton;
 
     private void startService() {
         try {
             final Intent intent = new Intent().setComponent(EXAMPLE_SERVICE_COMPONENT);
-            bindService(intent, mServiceConnectionListener, BIND_AUTO_CREATE);
+            requireContext().bindService(intent, mServiceConnectionListener, BIND_AUTO_CREATE);
         } catch (Exception e) {
             logStatus("bindService", toStatus(e), Key.PACKAGE, EXAMPLE_SERVICE_PACKAGE);
         }
     }
 
     private void stopService() {
-        unbindService(mServiceConnectionListener);
+        requireContext().unbindService(mServiceConnectionListener);
+    }
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.usubcription, container, false);
     }
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        initContentView();
-
-        // Lifecycle of a service should not depend on any client, but this project was created
-        // only for demonstration purposes and we do not want the example service to run when a
-        // client application is not in use.
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
         startService();
-
         // We use main thread executor for simplicity of demonstration API, consider to use own
         // working thread to handle events.
-        mUPClient = UPClient.create(getApplicationContext(), getMainExecutor(), (client, ready) -> {
+        mUPClient = create(getContext(), getMainExecutor(requireContext()), (client, ready) -> {
             if (ready) {
                 mLog.i(TAG, join(Key.EVENT, "uPClient connected"));
             } else {
@@ -162,33 +170,28 @@ public class ExampleActivity extends AppCompatActivity {
                 .thenCompose(it -> CompletableFuture.allOf(
                         registerListener(TOPIC_SUBSCRIPTION_UPDATE),
                         subscribe(TOPIC_DOOR_FRONT_LEFT)));
+        final View layout = requireView();
+        mLog.setOutput(layout.findViewById(R.id.output), layout.findViewById(R.id.output_scroller));
+        layout.findViewById(R.id.clear_output_button).setOnClickListener(bview -> mLog.clear());
+        mDoorLockState = layout.findViewById(R.id.door_lock_state);
+        mDoorLockButton = layout.findViewById(R.id.door_lock_button);
+        mDoorLockButton.setOnClickListener(dview -> setDoorLocked(DOOR_FRONT_LEFT.getInstance(), true));
+        mDoorUnlockButton = layout.findViewById(R.id.door_unlock_button);
+        mDoorUnlockButton.setOnClickListener(doneview -> setDoorLocked(DOOR_FRONT_LEFT.getInstance(), false));
+        updateDoorState(null);
     }
 
     @Override
-    protected void onDestroy() {
+    public void onDestroyView() {
+        super.onDestroyView();
         mLog.reset();
-
         stopService();
-
         CompletableFuture.allOf(
                         unregisterListener(TOPIC_SUBSCRIPTION_UPDATE),
                         unsubscribe(TOPIC_DOOR_FRONT_LEFT))
                 .exceptionally(exception -> null)
                 .thenCompose(it -> mUPClient.disconnect())
                 .whenComplete((status, exception) -> logStatus("disconnect", status));
-        super.onDestroy();
-    }
-
-    private void initContentView() {
-        setContentView(R.layout.activity_example);
-        mLog.setOutput(findViewById(R.id.output), findViewById(R.id.output_scroller));
-        findViewById(R.id.clear_output_button).setOnClickListener(view -> mLog.clear());
-        mDoorLockState = findViewById(R.id.door_lock_state);
-        mDoorLockButton = findViewById(R.id.door_lock_button);
-        mDoorLockButton.setOnClickListener(view -> setDoorLocked(DOOR_FRONT_LEFT.getInstance(), true));
-        mDoorUnlockButton = findViewById(R.id.door_unlock_button);
-        mDoorUnlockButton.setOnClickListener(view -> setDoorLocked(DOOR_FRONT_LEFT.getInstance(), false));
-        updateDoorState(null);
     }
 
     private @NonNull CompletableFuture<UStatus> registerListener(@NonNull UUri topic) {
@@ -301,7 +304,7 @@ public class ExampleActivity extends AppCompatActivity {
                     logStatus("executeDoorCommand", status, Key.LATENCY, delta);
                     return null;
                 })
-                .thenRun(() -> getMainExecutor().execute(() -> setLockButtonsEnabled(true)));
+                .thenRun(() -> getMainExecutor(requireContext()).execute(() -> setLockButtonsEnabled(true)));
     }
 
     private @NonNull UStatus logStatus(@NonNull String method, @NonNull UStatus status, Object... args) {
@@ -309,3 +312,4 @@ public class ExampleActivity extends AppCompatActivity {
         return status;
     }
 }
+
