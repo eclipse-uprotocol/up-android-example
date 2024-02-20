@@ -18,4 +18,31 @@
     <string name="output_label">Output:</string>
     <string name="locked">Locked</string>
     <string name="unlocked">Unlocked</string>
+    <string name="fragment1_button">USubcription</string>
+    <string name="fragment2_button">UDiscovery</string>
+    <string name="pleaseSelect">Please Select</string>
+    <string name="LookupUri">LookupUri</string>
+    <string name="FindNodes">FindNodes</string>
+    <string name="FindNodeProperties">FindNodeProperties</string>
+    <string name="UpdateNode">UpdateNode</string>
+    <string name="DeleteNodes">DeleteNodes</string>
+    <string name="AddNodes">AddNodes</string>
+    <string name="UpdateProperty">UpdateProperty</string>
+    <string name="RegisterForNotifications">RegisterForNotifications</string>
+    <string name="UnregisterForNotifications">UnregisterForNotifications</string>
+    <string name="execute">EXECUTE</string>
+    <string-array name="discovery_values">
+        <item>@string/pleaseSelect</item>
+        <item>@string/LookupUri</item>
+        <item>@string/FindNodes</item>
+        <item>@string/FindNodeProperties</item>
+        <item>@string/UpdateNode</item>
+        <item>@string/DeleteNodes</item>
+        <item>@string/AddNodes</item>
+        <item>@string/UpdateProperty</item>
+        <item>@string/RegisterForNotifications</item>
+        <item>@string/UnregisterForNotifications</item>
+    </string-array>
+
+
 </resources>
