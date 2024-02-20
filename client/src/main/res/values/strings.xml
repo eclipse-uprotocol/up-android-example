@@ -31,6 +31,7 @@
     <string name="RegisterForNotifications">RegisterForNotifications</string>
     <string name="UnregisterForNotifications">UnregisterForNotifications</string>
     <string name="execute">EXECUTE</string>
+    <string name="selectOption">Select Option</string>
     <string-array name="discovery_values">
         <item>@string/pleaseSelect</item>
         <item>@string/LookupUri</item>
