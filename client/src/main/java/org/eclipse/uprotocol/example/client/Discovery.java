@@ -40,6 +40,7 @@ import static org.eclipse.uprotocol.core.udiscovery.v3.UDiscovery.METHOD_UPDATE_
 import static org.eclipse.uprotocol.example.client.JsonNodeTest.REGISTRY_JSON;
 import static org.eclipse.uprotocol.example.client.JsonNodeTest.TEST_AUTHORITY_NAME;
 import static org.eclipse.uprotocol.example.client.JsonNodeTest.TEST_ENTITY_NAME;
+import static org.eclipse.uprotocol.transport.builder.UPayloadBuilder.pack;
 
 import android.content.ComponentName;
 import android.content.Intent;
@@ -56,7 +57,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 
 import org.eclipse.uprotocol.UPClient;
@@ -66,14 +66,12 @@ import org.eclipse.uprotocol.core.udiscovery.v3.DeleteNodesRequest;
 import org.eclipse.uprotocol.core.udiscovery.v3.FindNodesRequest;
 import org.eclipse.uprotocol.core.udiscovery.v3.Node;
 import org.eclipse.uprotocol.core.udiscovery.v3.UDiscovery;
-import org.eclipse.uprotocol.example.v1.Example;
-import org.eclipse.uprotocol.rpc.CallOptions;
 import org.eclipse.uprotocol.uri.factory.UResourceBuilder;
 import org.eclipse.uprotocol.uri.serializer.LongUriSerializer;
-import org.eclipse.uprotocol.v1.UAttributes;
 import org.eclipse.uprotocol.v1.UAuthority;
 import org.eclipse.uprotocol.v1.UCode;
 import org.eclipse.uprotocol.v1.UEntity;
+import org.eclipse.uprotocol.v1.UMessage;
 import org.eclipse.uprotocol.v1.UResource;
 import org.eclipse.uprotocol.v1.UStatus;
 import org.eclipse.uprotocol.v1.UUri;
@@ -101,7 +99,7 @@ public class Discovery extends Fragment implements AdapterView.OnItemSelectedLis
             .setMessage("Doors")
             .build();
     private static final UUri TOPIC_DOOR_FRONT_LEFT = UUri.newBuilder()
-            .setEntity(Example.SERVICE)
+            .setEntity(SERVICE)
             .setResource(DOOR_FRONT_LEFT)
             .build();
 
@@ -160,7 +158,7 @@ public class Discovery extends Fragment implements AdapterView.OnItemSelectedLis
     private void initializeUPClient() {
         startService();
         mUpClient = UPClient.create(requireContext(), mExecutor, this);
-        mUDiscovery = UDiscovery.newStub(mUpClient, UAuthority.newBuilder().getDefaultInstanceForType(), CallOptions.DEFAULT);
+        mUDiscovery = UDiscovery.newStub(mUpClient);
         mUpClient.connect().thenApply(connected -> {
             if (connected.getCode() == UCode.OK) {
                 mLog.i(TAG, "UPClient connected");
@@ -174,14 +172,16 @@ public class Discovery extends Fragment implements AdapterView.OnItemSelectedLis
     private void lookupUri() {
         UEntity uEntity = UEntity.newBuilder().setName(TEST_ENTITY_NAME).build();
         UAuthority authority = UAuthority.newBuilder().setName(TEST_AUTHORITY_NAME).build();
-        final UUri lookupUriRequest = UUri.newBuilder().setEntity(uEntity).setAuthority(authority).build();
+        final UUri lookupUriRequest = UUri.newBuilder().setEntity(uEntity).setAuthority(authority).setResource(DOOR_FRONT_LEFT).build();
+        final String uri = LongUriSerializer.instance().serialize(lookupUriRequest);
+        mLog.i(TAG, join(Key.EVENT, "lookupUri", uri));
         mUDiscovery.lookupUri(lookupUriRequest)
                 .thenApply(uriResponse -> {
                     final UStatus status = uriResponse.getStatus();
                     checkStatusOk(status);
                     checkArgument(!uriResponse.hasUris(), "LookupUri failed");
-                    final UUri uri = uriResponse.getUris().getUris(0);
-                    mLog.i(TAG, join(Key.EVENT, "received LookupUri response " + uri, status));
+                    final UUri uUri = uriResponse.getUris().getUris(0);
+                    mLog.i(TAG, join(Key.EVENT, "received LookupUri response " + uUri, status));
                     return uriResponse;
                 }).exceptionally(e -> {
                     mLog.e(TAG, join(Key.EVENT, "lookupUri Exception", toStatus(e)));
@@ -190,9 +190,11 @@ public class Discovery extends Fragment implements AdapterView.OnItemSelectedLis
     }
 
     private void findNodes() {
-        UAuthority uAuthority = UAuthority.newBuilder().setName(TEST_AUTHORITY_NAME).build();
-        final UUri uUri = UUri.newBuilder().setAuthority(uAuthority).setEntity(SERVICE).setResource(DOOR_FRONT_LEFT).build();
-        final FindNodesRequest findNodesRequest = FindNodesRequest.newBuilder().setUri(uUri.toString()).build();
+        UAuthority authority = UAuthority.newBuilder().setName(TEST_AUTHORITY_NAME).build();
+        final UUri uri = UUri.newBuilder().setAuthority(authority).build();
+        final String uUri = LongUriSerializer.instance().serialize(uri);
+        final FindNodesRequest findNodesRequest = FindNodesRequest.newBuilder().setUri(uUri).setDepth(0).build();
+        mLog.i(TAG, join(Key.EVENT, "findNodes", uri));
         mUDiscovery.findNodes(findNodesRequest)
                 .thenApply(findNodesResponse -> {
                     final UStatus status = findNodesResponse.getStatus();
@@ -209,32 +211,33 @@ public class Discovery extends Fragment implements AdapterView.OnItemSelectedLis
 
     private void addNodes() {
         try {
-        UResource uResource = UResourceBuilder.forRpcRequest(METHOD_ADD_NODES);
-        final UUri uUri = UUri.newBuilder().setEntity(SERVICE).setResource(uResource).build();
-        Node.Builder nodeBuilder = Node.newBuilder();
-        JsonFormat.parser().ignoringUnknownFields().merge(REGISTRY_JSON, nodeBuilder);
-        String uri = LongUriSerializer.instance().serialize(uUri);
-        final AddNodesRequest findNodesRequest = AddNodesRequest.newBuilder().setParentUri(uri).
-                setNodes(0, nodeBuilder).build();
-        mUDiscovery.addNodes(findNodesRequest)
-                .thenApply(status -> {
-                    checkStatusOk(status);
-                    mLog.i(TAG, join(Key.EVENT, "received AddNodes response", status));
-                    return status;
-                }).exceptionally(e -> {
-                    mLog.e(TAG, join(Key.EVENT, "addNodes Exception", toStatus(e)));
-                    return null;
-                });
+            Node.Builder nodeBuilder = Node.newBuilder();
+            JsonFormat.parser().ignoringUnknownFields().merge(REGISTRY_JSON, nodeBuilder);
+            AddNodesRequest addNodesRequest = AddNodesRequest.newBuilder().addNodes(nodeBuilder).build();
+            UMessage message = UMessage.newBuilder().setPayload(pack(addNodesRequest)).build();
+            mLog.i(TAG, join(Key.EVENT, "addNodes", message.getAttributes().getSource()));
+            mUDiscovery.addNodes(addNodesRequest)
+                    .thenApply(status -> {
+                        checkStatusOk(status);
+                        mLog.i(TAG, join(Key.EVENT, "received AddNodes response", status));
+                        return status;
+                    }).exceptionally(e -> {
+                        mLog.e(TAG, join(Key.EVENT, "addNodes Exception", toStatus(e)));
+                        return null;
+                    });
         } catch (Exception e) {
             mLog.e(TAG, join(Key.EVENT, "addNodes Exception", toStatus(e)));
         }
     }
 
     private void deleteNodes() {
-        UAuthority uAuthority = UAuthority.newBuilder().setName(TEST_AUTHORITY_NAME).build();
-        final UUri uUri = UUri.newBuilder().setAuthority(uAuthority).setEntity(SERVICE).setResource(DOOR_FRONT_LEFT).build();
-        final String uri = LongUriSerializer.instance().serialize(uUri);
-        DeleteNodesRequest deleteNodesRequest = DeleteNodesRequest.newBuilder().addUris(uri).build();
+        final UResource uResource = UResourceBuilder.forRpcRequest(METHOD_ADD_NODES);
+        final UAuthority uAuthority = UAuthority.newBuilder().setName(TEST_AUTHORITY_NAME).build();
+        final UEntity entity = UEntity.newBuilder().setName(TEST_ENTITY_NAME).build();
+        final UUri uri = UUri.newBuilder().setAuthority(uAuthority).setEntity(entity).setResource(uResource).build();
+        final String uUri = LongUriSerializer.instance().serialize(uri);
+        mLog.i(TAG, join(Key.EVENT, "deleteNodes", uUri));
+        DeleteNodesRequest deleteNodesRequest = DeleteNodesRequest.newBuilder().addUris(uUri).build();
         mUDiscovery.deleteNodes(deleteNodesRequest)
                 .thenApply(uStatus -> {
                     checkStatusOk(uStatus);
