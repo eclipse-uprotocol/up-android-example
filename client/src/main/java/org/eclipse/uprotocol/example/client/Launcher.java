@@ -31,8 +31,11 @@ import android.widget.Button;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 public class Launcher extends AppCompatActivity {
 
+    AtomicBoolean fragmentOneSelected = new AtomicBoolean(false);
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -40,6 +43,7 @@ public class Launcher extends AppCompatActivity {
         Button subcritptionButton = findViewById(R.id.usubscription);
 
         if (null  == savedInstanceState) {
+            fragmentOneSelected.set(true);
             getSupportFragmentManager().beginTransaction()
                     .setReorderingAllowed(true)
                     .add(R.id.fragment_container_view, USubcription.class, null)
@@ -51,7 +55,25 @@ public class Launcher extends AppCompatActivity {
     }
 
     public void selectFragment(View view) {
-        if(view == findViewById(R.id.usubscription)) {
+        if(view == findViewById(R.id.usubscription) && fragmentOneSelected.get()) {
+            fragmentOneSelected.set(false);
+            getSupportFragmentManager().beginTransaction()
+                    .setReorderingAllowed(true)
+                    .replace(R.id.fragment_container_view, USubcription.class, null)
+                    .commit();
+        } else if(view == findViewById(R.id.udiscovery) && !fragmentOneSelected.get()) {
+            fragmentOneSelected.set(true);
+            getSupportFragmentManager().beginTransaction()
+                    .setReorderingAllowed(true)
+                    .replace(R.id.fragment_container_view, Discovery.class, null)
+                    .commit();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (fragmentOneSelected.get()) {
             getSupportFragmentManager().beginTransaction()
                     .setReorderingAllowed(true)
                     .replace(R.id.fragment_container_view, USubcription.class, null)
