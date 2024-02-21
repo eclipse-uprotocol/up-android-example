@@ -200,7 +200,7 @@ public class Discovery extends Fragment implements AdapterView.OnItemSelectedLis
                     checkStatusOk(status);
                     checkArgument(findNodesResponse.hasStatus(), "FindNodes failed");
                     final int nodesCount = findNodesResponse.getNodesCount();
-                    mLog.i(TAG, join(Key.EVENT, "received FindNodesResponse -> Node count and UStatus" + nodesCount, status));
+                    mLog.i(TAG, join(Key.EVENT, "received FindNodesResponse -> Node count and UStatus", nodesCount, status));
                     return findNodesResponse;
                 }).exceptionally(e -> {
                     mLog.e(TAG, join(Key.EVENT, "findNodes Exception", toStatus(e)));
