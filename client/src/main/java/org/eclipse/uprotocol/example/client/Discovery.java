@@ -178,7 +178,7 @@ public class Discovery extends Fragment implements AdapterView.OnItemSelectedLis
                 .thenApply(uriResponse -> {
                     final UStatus status = uriResponse.getStatus();
                     checkStatusOk(status);
-                    checkArgument(!uriResponse.hasUris(), "LookupUri failed");
+                    checkArgument(uriResponse.hasUris(), "LookupUri failed");
                     final UUri uUri = uriResponse.getUris().getUris(0);
                     mLog.i(TAG, join(Key.EVENT, "received LookupUri response " + uUri, status));
                     return uriResponse;
@@ -198,7 +198,7 @@ public class Discovery extends Fragment implements AdapterView.OnItemSelectedLis
                 .thenApply(findNodesResponse -> {
                     final UStatus status = findNodesResponse.getStatus();
                     checkStatusOk(status);
-                    checkArgument(!findNodesResponse.hasStatus(), "FindNodes failed");
+                    checkArgument(findNodesResponse.hasStatus(), "FindNodes failed");
                     final int nodesCount = findNodesResponse.getNodesCount();
                     mLog.i(TAG, join(Key.EVENT, "received FindNodesResponse -> Node count and UStatus" + nodesCount, status));
                     return findNodesResponse;
