@@ -37,7 +37,7 @@ import static org.eclipse.uprotocol.core.udiscovery.v3.UDiscovery.METHOD_REGISTE
 import static org.eclipse.uprotocol.core.udiscovery.v3.UDiscovery.METHOD_UNREGISTER_FOR_NOTIFICATIONS;
 import static org.eclipse.uprotocol.core.udiscovery.v3.UDiscovery.METHOD_UPDATE_NODE;
 import static org.eclipse.uprotocol.core.udiscovery.v3.UDiscovery.METHOD_UPDATE_PROPERTY;
-import static org.eclipse.uprotocol.example.client.JsonNodeTest.REGISTRY_JSON;
+import static org.eclipse.uprotocol.example.client.JsonNodeTest.JSON_PROTOBUF;
 import static org.eclipse.uprotocol.example.client.JsonNodeTest.TEST_AUTHORITY_NAME;
 import static org.eclipse.uprotocol.example.client.JsonNodeTest.TEST_ENTITY_NAME;
 import static org.eclipse.uprotocol.transport.builder.UPayloadBuilder.pack;
@@ -66,7 +66,6 @@ import org.eclipse.uprotocol.core.udiscovery.v3.DeleteNodesRequest;
 import org.eclipse.uprotocol.core.udiscovery.v3.FindNodesRequest;
 import org.eclipse.uprotocol.core.udiscovery.v3.Node;
 import org.eclipse.uprotocol.core.udiscovery.v3.UDiscovery;
-import org.eclipse.uprotocol.uri.factory.UResourceBuilder;
 import org.eclipse.uprotocol.uri.serializer.LongUriSerializer;
 import org.eclipse.uprotocol.v1.UAuthority;
 import org.eclipse.uprotocol.v1.UCode;
@@ -170,7 +169,7 @@ public class Discovery extends Fragment implements AdapterView.OnItemSelectedLis
     }
 
     private void lookupUri() {
-        UEntity uEntity = UEntity.newBuilder().setName(TEST_ENTITY_NAME).build();
+        UEntity uEntity = UEntity.newBuilder().setName(TEST_ENTITY_NAME).setVersionMajor(1).build();
         UAuthority authority = UAuthority.newBuilder().setName(TEST_AUTHORITY_NAME).build();
         final UUri lookupUriRequest = UUri.newBuilder().setEntity(uEntity).setAuthority(authority).setResource(DOOR_FRONT_LEFT).build();
         final String uri = LongUriSerializer.instance().serialize(lookupUriRequest);
@@ -193,7 +192,7 @@ public class Discovery extends Fragment implements AdapterView.OnItemSelectedLis
         UAuthority authority = UAuthority.newBuilder().setName(TEST_AUTHORITY_NAME).build();
         final UUri uri = UUri.newBuilder().setAuthority(authority).build();
         final String uUri = LongUriSerializer.instance().serialize(uri);
-        final FindNodesRequest findNodesRequest = FindNodesRequest.newBuilder().setUri(uUri).setDepth(0).build();
+        final FindNodesRequest findNodesRequest = FindNodesRequest.newBuilder().setUri(uUri).setDepth(-1).build();
         mLog.i(TAG, join(Key.EVENT, "findNodes", uri));
         mUDiscovery.findNodes(findNodesRequest)
                 .thenApply(findNodesResponse -> {
@@ -212,8 +211,11 @@ public class Discovery extends Fragment implements AdapterView.OnItemSelectedLis
     private void addNodes() {
         try {
             Node.Builder nodeBuilder = Node.newBuilder();
-            JsonFormat.parser().ignoringUnknownFields().merge(REGISTRY_JSON, nodeBuilder);
-            AddNodesRequest addNodesRequest = AddNodesRequest.newBuilder().addNodes(nodeBuilder).build();
+            JsonFormat.parser().ignoringUnknownFields().merge(JSON_PROTOBUF, nodeBuilder);
+            UAuthority authority = UAuthority.newBuilder().setName(TEST_AUTHORITY_NAME).build();
+            UUri uri = UUri.newBuilder().setAuthority(authority).build();
+            String uUri = LongUriSerializer.instance().serialize(uri);
+            AddNodesRequest addNodesRequest = AddNodesRequest.newBuilder().addNodes(nodeBuilder).setParentUri(uUri).build();
             UMessage message = UMessage.newBuilder().setPayload(pack(addNodesRequest)).build();
             mLog.i(TAG, join(Key.EVENT, "addNodes", message.getAttributes().getSource()));
             mUDiscovery.addNodes(addNodesRequest)
@@ -231,10 +233,9 @@ public class Discovery extends Fragment implements AdapterView.OnItemSelectedLis
     }
 
     private void deleteNodes() {
-        final UResource uResource = UResourceBuilder.forRpcRequest(METHOD_ADD_NODES);
         final UAuthority uAuthority = UAuthority.newBuilder().setName(TEST_AUTHORITY_NAME).build();
-        final UEntity entity = UEntity.newBuilder().setName(TEST_ENTITY_NAME).build();
-        final UUri uri = UUri.newBuilder().setAuthority(uAuthority).setEntity(entity).setResource(uResource).build();
+        final UEntity entity = UEntity.newBuilder().setName(TEST_ENTITY_NAME).setVersionMajor(1).build();
+        final UUri uri = UUri.newBuilder().setAuthority(uAuthority).setEntity(entity).setResource(DOOR_FRONT_LEFT).build();
         final String uUri = LongUriSerializer.instance().serialize(uri);
         mLog.i(TAG, join(Key.EVENT, "deleteNodes", uUri));
         DeleteNodesRequest deleteNodesRequest = DeleteNodesRequest.newBuilder().addUris(uUri).build();

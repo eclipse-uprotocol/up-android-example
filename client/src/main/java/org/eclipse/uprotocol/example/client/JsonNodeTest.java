@@ -25,9 +25,9 @@
 package org.eclipse.uprotocol.example.client;
 
 public class JsonNodeTest {
-    public static final String TEST_DOMAIN = "veh.protocol.com";
-    public static final String TEST_DEVICE = "vcu";
-    public static final String TEST_ENTITY_NAME = "body.access";
+    public static final String TEST_DOMAIN = "domain_name";
+    public static final String TEST_DEVICE = "device_name";
+    public static final String TEST_ENTITY_NAME = "example.service";
     public static final String TEST_PROPERTY1 = "ent_prop1";
     public static final String TEST_PROPERTY2 = "ent_prop2";
     public static final String JSON_HIERARCHY = "hierarchy";
@@ -132,6 +132,39 @@ public class JsonNodeTest {
             + "       },\n"
             + "       \"type\": \"DOMAIN\"\n"
             + "     }";
+
+    protected static final String JSON_PROTOBUF = "{\n" +
+            "  \"uri\": \"//device_name.domain_name/example.service\",\n" +
+            "  \"nodes\": [\n" +
+            "    {\n" +
+            "      \"uri\": \"//device_name.domain_name/example.service/1\",\n" +
+            "      \"nodes\": [\n" +
+            "        {\n" +
+            "          \"uri\": \"//device_name.domain_name/example.service/1/doors.front_left#Doors\",\n" +
+            "          \"properties\": {\n" +
+            "            \"id\": {\n" +
+            "              \"uInteger\": 16\n" +
+            "            }\n" +
+            "          },\n" +
+            "          \"type\": \"TOPIC\"\n" +
+            "        }\n" +
+            "      ],\n" +
+            "      \"properties\": {\n" +
+            "        \"id\": {\n" +
+            "          \"uInteger\": 27\n" +
+            "        },\n" +
+            "        \"major_version\": {\n" +
+            "          \"uInteger\": 1\n" +
+            "        },\n" +
+            "        \"minor_version\": {\n" +
+            "          \"uInteger\": 0\n" +
+            "        }\n" +
+            "      },\n" +
+            "      \"type\": \"VERSION\"\n" +
+            "    }\n" +
+            "  ],\n" +
+            "  \"type\": \"ENTITY\"\n" +
+            "}";
     protected static final String JSON_PROTOBUF_EXCEPTION = "{\n"
             + "  \"" + JSON_AUTHORITY + "\": \"//" + TEST_AUTHORITY_NAME + "\",\n"
             + "  \"" + JSON_DATA + "\": {\n"
