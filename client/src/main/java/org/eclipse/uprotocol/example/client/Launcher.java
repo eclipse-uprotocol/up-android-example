@@ -74,11 +74,13 @@ public class Launcher extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         if (fragmentOneSelected.get()) {
+            fragmentOneSelected.set(false);
             getSupportFragmentManager().beginTransaction()
                     .setReorderingAllowed(true)
                     .replace(R.id.fragment_container_view, USubcription.class, null)
                     .commit();
         } else {
+            fragmentOneSelected.set(true);
             getSupportFragmentManager().beginTransaction()
                     .setReorderingAllowed(true)
                     .replace(R.id.fragment_container_view, Discovery.class, null)
